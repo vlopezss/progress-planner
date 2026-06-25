@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress Report Viewer</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --panel-2: #1c2030;
+    --border: #2a2f3f;
+    --text: #e6e8ee;
+    --text-dim: #9aa1b4;
+    --text-faint: #6b7185;
+    --accent: #6ea8ff;
+    --green: #3ddc84;
+    --green-dim: #1f4a35;
+    --red: #ff6b6b;
+    --red-dim: #4a2323;
+    --mono: 'SF Mono', 'Roboto Mono', 'Consolas', monospace;
+    --sans: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  header h1 {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  header .sub {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .report-picker {
+    margin-top: 12px;
+  }
+
+  .report-picker select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: var(--sans);
+  }
+
+  .meta-grid {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    max-width: 900px;
+  }
+
+  .meta-item {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .meta-item .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+  }
+
+  .meta-item .value {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .meta-item .value.mono {
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    overflow-x: auto;
+  }
+
+  nav.tabs button {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    font-family: var(--sans);
+  }
+
+  nav.tabs button:hover {
+    color: var(--text);
+  }
+
+  nav.tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  nav.tabs button .count {
+    color: var(--text-faint);
+    font-size: 11px;
+    margin-left: 4px;
+  }
+
+  main {
+    padding: 24px 32px 64px;
+    max-width: 1100px;
+  }
+
+  .section-block {
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .section-title h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .section-code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .req-tree {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  .req-row {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .req-row:last-child {
+    border-bottom: none;
+  }
+
+  .req-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .req-header:hover {
+    background: var(--panel-2);
+  }
+
+  .req-row[data-depth="0"] > .req-header { padding-left: 14px; font-weight: 600; }
+  .req-row[data-depth="1"] > .req-header { padding-left: 32px; }
+  .req-row[data-depth="2"] > .req-header { padding-left: 50px; }
+  .req-row[data-depth="3"] > .req-header { padding-left: 68px; }
+  .req-row[data-depth="4"] > .req-header { padding-left: 86px; }
+
+  .disclosure {
+    width: 14px;
+    flex-shrink: 0;
+    color: var(--text-faint);
+    font-size: 11px;
+    transition: transform 0.15s ease;
+  }
+  .disclosure.open { transform: rotate(90deg); }
+  .disclosure.hidden { visibility: hidden; }
+
+  .req-name {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .req-code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-left: 6px;
+  }
+
+  .pill {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.satisfied { background: var(--green-dim); color: var(--green); }
+  .pill.not-satisfied { background: var(--red-dim); color: var(--red); }
+  .pill.unknown { background: var(--panel-2); color: var(--text-faint); border: 1px solid var(--border); }
+
+  .progress-tag {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .req-body {
+    padding: 0 14px 14px;
+    display: none;
+  }
+  .req-body.open { display: block; }
+  .req-row[data-depth="0"] > .req-body { padding-left: 14px; }
+  .req-row[data-depth="1"] > .req-body { padding-left: 32px; }
+  .req-row[data-depth="2"] > .req-body { padding-left: 50px; }
+  .req-row[data-depth="3"] > .req-body { padding-left: 68px; }
+
+  .req-note {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin: 4px 0 10px;
+    max-width: 720px;
+  }
+
+  table.course-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin-bottom: 10px;
+  }
+
+  table.course-table th {
+    text-align: left;
+    color: var(--text-faint);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.course-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-family: var(--mono);
+  }
+
+  table.course-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .available-courses {
+    font-size: 12px;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    line-height: 1.6;
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+  }
+
+  .available-courses .label {
+    color: var(--text-dim);
+    font-family: var(--sans);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .empty-state {
+    color: var(--text-faint);
+    font-size: 13px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .history-table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .history-table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .history-table-wrap th {
+    text-align: left;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 8px 14px;
+    position: sticky;
+    top: 0;
+  }
+
+  .history-table-wrap td {
+    padding: 7px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-family: var(--mono);
+  }
+
+  footer {
+    padding: 16px 32px;
+    color: var(--text-faint);
+    font-size: 11px;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Progress Report Viewer</h1>
+  <div class="sub">Local SQLite verification view &middot; data exported from <code>dev.db</code></div>
+  <div class="report-picker">
+    <select id="report-select" onchange="selectReport(this.value)"></select>
+  </div>
+  <div class="meta-grid" id="meta-grid"></div>
+</header>
+
+<nav class="tabs" id="tabs"></nav>
+
+<main id="main"></main>
+
+<footer>
+  Generated by export_for_viewer.py. Re-run that script after changing dev.db, then refresh this file.
+</footer>
+
+<script>
+const DATA = __VIEWER_DATA__;
+
+const CATEGORY_LABELS = {
+  university: "University & Campus",
+  college: "College",
+  major: "Major",
+  minor: "Minor",
+  in_progress: "In Progress Coursework",
+  additional: "Additional Coursework",
+};
+
+const CATEGORY_ORDER = ["university", "college", "major", "minor", "in_progress", "additional"];
+
+let currentReportIndex = 0;
+let currentCategory = null;
+
+function cleanNote(note) {
+  if (!note) return "";
+  // The parser occasionally appends a re-serialized course table onto the
+  // explanatory note text (a known parser quirk -- see README "Known
+  // limitations"). Truncate at the point that contamination begins.
+  const idx = note.indexOf("Term Subject Catalog Nbr");
+  const cleaned = idx !== -1 ? note.slice(0, idx) : note;
+  return cleaned.trim();
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function statusPill(status) {
+  if (!status) return '<span class="pill unknown">&mdash;</span>';
+  const s = status.toLowerCase();
+  if (s.includes("not satisfied")) {
+    return '<span class="pill not-satisfied">' + escapeHtml(status) + '</span>';
+  }
+  if (s.includes("satisfied")) {
+    return '<span class="pill satisfied">' + escapeHtml(status) + '</span>';
+  }
+  return '<span class="pill unknown">' + escapeHtml(status) + '</span>';
+}
+
+function progressTag(node) {
+  if (node.units_required !== null && node.units_required !== undefined) {
+    return '<span class="progress-tag">' + (node.units_used ?? 0) + ' / ' + node.units_required + ' units</span>';
+  }
+  if (node.courses_required !== null && node.courses_required !== undefined) {
+    return '<span class="progress-tag">' + (node.courses_used ?? 0) + ' / ' + node.courses_required + ' courses</span>';
+  }
+  if (node.gpa_required !== null && node.gpa_required !== undefined) {
+    return '<span class="progress-tag">' + (node.gpa_completed ?? "?") + ' / ' + node.gpa_required + ' gpa</span>';
+  }
+  return "";
+}
+
+function renderCourseTable(courses) {
+  if (!courses || courses.length === 0) return "";
+  const rows = courses.map(c =>
+    '<tr>' +
+      '<td>' + escapeHtml(c.term) + '</td>' +
+      '<td>' + escapeHtml(c.subject) + ' ' + escapeHtml(c.catalog_nbr) + '</td>' +
+      '<td>' + escapeHtml(c.course_title) + '</td>' +
+      '<td>' + escapeHtml(c.grade) + '</td>' +
+      '<td>' + (c.units ?? "") + '</td>' +
+      '<td>' + escapeHtml(c.course_type) + '</td>' +
+    '</tr>'
+  ).join("");
+  return '<table class="course-table"><thead><tr><th>Term</th><th>Course</th><th>Title</th><th>Grade</th><th>Units</th><th>Type</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function renderAvailableCourses(list) {
+  if (!list || list.length === 0) return "";
+  const text = list.map(c => c.subject + ' ' + c.catalog_nbr).join(", ");
+  return '<div class="available-courses"><span class="label">Eligible but not yet used (' + list.length + ')</span>' + escapeHtml(text) + '</div>';
+}
+
+function renderRequirementNode(node, depth) {
+  const hasBody = node.notes || (node.courses && node.courses.length) ||
+                  (node.courses_available && node.courses_available.length);
+  const hasChildren = node.children && node.children.length > 0;
+  const note = cleanNote(node.notes);
+
+  let bodyHtml = "";
+  if (note) bodyHtml += '<div class="req-note">' + escapeHtml(note) + '</div>';
+  bodyHtml += renderCourseTable(node.courses);
+  bodyHtml += renderAvailableCourses(node.courses_available);
+
+  const childrenHtml = hasChildren
+    ? node.children.map(c => renderRequirementNode(c, depth + 1)).join("")
+    : "";
+
+  const disclosureClass = (hasBody && !hasChildren) ? "" : "hidden";
+
+  return (
+    '<div class="req-row" data-depth="' + depth + '">' +
+      '<div class="req-header" onclick="toggleReq(this)">' +
+        '<span class="disclosure ' + disclosureClass + '">&#9656;</span>' +
+        '<span class="req-name">' + escapeHtml(node.name) + (node.code ? '<span class="req-code">' + escapeHtml(node.code) + '</span>' : '') + '</span>' +
+        progressTag(node) +
+        statusPill(node.status) +
+      '</div>' +
+      '<div class="req-body">' + bodyHtml + '</div>' +
+      childrenHtml +
+    '</div>'
+  );
+}
+
+function toggleReq(headerEl) {
+  const row = headerEl.parentElement;
+  const body = row.querySelector(":scope > .req-body");
+  const disclosure = headerEl.querySelector(".disclosure");
+  if (!body) return;
+  const isOpen = body.classList.contains("open");
+  body.classList.toggle("open", !isOpen);
+  disclosure.classList.toggle("open", !isOpen);
+}
+
+function renderCategory(report, category) {
+  const sections = report.categories[category];
+  if (!sections || sections.length === 0) {
+    return '<div class="empty-state">No data in this category.</div>';
+  }
+  return sections.map(sec =>
+    '<div class="section-block">' +
+      '<div class="section-title">' +
+        '<h2>' + escapeHtml(sec.section_name) + '</h2>' +
+        (sec.section_code ? '<span class="section-code">' + escapeHtml(sec.section_code) + '</span>' : '') +
+        (sec.overall_status ? statusPill(sec.overall_status) : '') +
+      '</div>' +
+      '<div class="req-tree">' +
+        (sec.requirements.map(r => renderRequirementNode(r, 0)).join("") || '<div class="empty-state">No requirements recorded.</div>') +
+      '</div>' +
+    '</div>'
+  ).join("");
+}
+
+function renderHistory(report) {
+  const rows = report.course_history.map(c =>
+    '<tr>' +
+      '<td>' + escapeHtml(c.term) + '</td>' +
+      '<td>' + escapeHtml(c.subject) + ' ' + escapeHtml(c.catalog_nbr) + '</td>' +
+      '<td>' + escapeHtml(c.title) + '</td>' +
+      '<td>' + escapeHtml(c.grade) + '</td>' +
+      '<td>' + (c.units ?? "") + '</td>' +
+      '<td>' + escapeHtml(c.course_type) + '</td>' +
+      '<td>' + escapeHtml(c.requirement_designation) + '</td>' +
+    '</tr>'
+  ).join("");
+  return '<div class="history-table-wrap"><table><thead><tr><th>Term</th><th>Course</th><th>Title</th><th>Grade</th><th>Units</th><th>Type</th><th>Designation</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function metaItem(label, value, mono) {
+  return (
+    '<div class="meta-item">' +
+      '<div class="label">' + escapeHtml(label) + '</div>' +
+      '<div class="value ' + (mono ? 'mono' : '') + '">' + escapeHtml(value) + '</div>' +
+    '</div>'
+  );
+}
+
+function renderMeta(report) {
+  const m = report.metadata;
+  const plans = report.academic_plans.map(p => p.plan_name + ' (' + p.plan_type + ')').join("; ");
+  const grid = document.getElementById("meta-grid");
+  grid.innerHTML = [
+    metaItem("Student", m.student_name),
+    metaItem("Student ID", m.student_id, true),
+    metaItem("Report Date", m.report_date, true),
+    metaItem("College", m.college),
+    metaItem("Full-time min. units", m.min_units_full_time ?? "unknown"),
+    metaItem("Academic plans", plans),
+  ].join("");
+}
+
+function renderTabs(report) {
+  const tabs = document.getElementById("tabs");
+  const available = CATEGORY_ORDER.filter(c => report.categories[c] && report.categories[c].length);
+  tabs.innerHTML = available.map(c => {
+    const reqCount = report.categories[c].reduce((sum, s) => sum + countReqs(s.requirements), 0);
+    return '<button data-cat="' + c + '" onclick="selectCategory(\'' + c + '\')">' + (CATEGORY_LABELS[c] || c) + '<span class="count">' + reqCount + '</span></button>';
+  }).join("") + '<button data-cat="__history" onclick="selectCategory(\'__history\')">Course History<span class="count">' + report.course_history.length + '</span></button>';
+
+  if (!currentCategory || !available.includes(currentCategory)) {
+    currentCategory = available[0];
+  }
+  highlightActiveTab();
+}
+
+function countReqs(nodes) {
+  let n = 0;
+  for (const node of nodes) {
+    n += 1;
+    if (node.children && node.children.length) n += countReqs(node.children);
+  }
+  return n;
+}
+
+function highlightActiveTab() {
+  document.querySelectorAll("nav.tabs button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.cat === currentCategory);
+  });
+}
+
+function selectCategory(cat) {
+  currentCategory = cat;
+  highlightActiveTab();
+  renderMain();
+}
+
+function renderMain() {
+  const report = DATA.reports[currentReportIndex];
+  const main = document.getElementById("main");
+  if (currentCategory === "__history") {
+    main.innerHTML = renderHistory(report);
+  } else {
+    main.innerHTML = renderCategory(report, currentCategory);
+  }
+}
+
+function selectReport(indexStr) {
+  currentReportIndex = parseInt(indexStr, 10);
+  currentCategory = null;
+  const report = DATA.reports[currentReportIndex];
+  renderMeta(report);
+  renderTabs(report);
+  renderMain();
+}
+
+function init() {
+  const select = document.getElementById("report-select");
+  select.innerHTML = DATA.reports.map((r, i) =>
+    '<option value="' + i + '">' + escapeHtml(r.metadata.student_name) + ' (' + escapeHtml(r.metadata.student_id) + ')</option>'
+  ).join("");
+  selectReport(0);
+}
+
+init();
+</script>
+
+</body>
+</html>

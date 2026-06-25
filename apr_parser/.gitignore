@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.db
+*.db-journal
+
+# Generated viewer artifacts -- regenerate with export_for_viewer.py +
+# build_viewer.py. viewer.html embeds report data directly in the page,
+# so if you ever load a real (non-synthetic) student report, do NOT commit
+# the generated viewer.html or viewer_data.json.
+viewer_data.json
+viewer.html
+
+# Keep sample_reports/ tracked only if you intend to commit synthetic test
+# PDFs to the repo. If these ever contain real student data, do NOT commit
+# them -- uncomment the line below.
+sample_reports/
+
+# The course catalog CSV is public, non-sensitive data, but it's large
+# (several MB) and easy to re-export from Berkeley's catalog site, so it's
+# not committed by default. Comment this out if you'd rather track it.
+catalog_data/*.csv
